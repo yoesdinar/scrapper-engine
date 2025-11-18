@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: config-worker
+    ports:
+      - "8082:8082"
+    environment:
+      - WORKER_PORT=8082
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: config-agent
+    environment:
+      - CONTROLLER_URL=http://host.docker.internal:8080
+      - CONTROLLER_USER=agent
+      - CONTROLLER_PASSWORD=agent123
+      - WORKER_URL=http://worker:8082
+      - CACHE_FILE=/app/cache/agent_config.cache
+    volumes:
+      - agent-cache:/app/cache
+    depends_on:
+      - worker
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  agent-cache:
+    driver: local

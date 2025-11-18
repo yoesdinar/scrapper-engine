@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: controller/Dockerfile
+    container_name: config-controller
+    ports:
+      - "8080:8080"
+    environment:
+      - CONTROLLER_PORT=8080
+      - CONTROLLER_DB_PATH=/app/data/controller.db
+      - CONTROLLER_AGENT_USER=agent
+      - CONTROLLER_AGENT_PASS=agent123
+      - CONTROLLER_ADMIN_USER=admin
+      - CONTROLLER_ADMIN_PASS=admin123
+    volumes:
+      - controller-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  controller-data:
+    driver: local
