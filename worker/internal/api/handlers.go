@@ -73,7 +73,6 @@ func (h *Handler) Hit(c *gin.Context) {
 		return
 	}
 
-	// Return the response with original status code and content type
 	c.Data(statusCode, "text/plain", body)
 }
 

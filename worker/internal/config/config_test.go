@@ -1,15 +1,15 @@
 package config
 
 import (
-"testing"
+	"testing"
 
-"github.com/doniyusdinar/config-management/pkg/models"
-"github.com/stretchr/testify/assert"
+	"github.com/doniyusdinar/config-management/pkg/models"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetConfigEmpty(t *testing.T) {
 	mgr := NewManager()
-	
+
 	_, hasConfig := mgr.GetConfig()
 	assert.False(t, hasConfig)
 	assert.False(t, mgr.HasConfig())
@@ -17,10 +17,10 @@ func TestGetConfigEmpty(t *testing.T) {
 
 func TestUpdateAndGetConfig(t *testing.T) {
 	mgr := NewManager()
-	
+
 	config := models.WorkerConfig{URL: "https://example.com"}
 	mgr.UpdateConfig(config)
-	
+
 	retrieved, hasConfig := mgr.GetConfig()
 	assert.True(t, hasConfig)
 	assert.True(t, mgr.HasConfig())
@@ -29,17 +29,17 @@ func TestUpdateAndGetConfig(t *testing.T) {
 
 func TestUpdateConfigMultipleTimes(t *testing.T) {
 	mgr := NewManager()
-	
+
 	urls := []string{
 		"https://example.com",
 		"https://test.com",
 		"https://final.com",
 	}
-	
+
 	for _, url := range urls {
 		config := models.WorkerConfig{URL: url}
 		mgr.UpdateConfig(config)
-		
+
 		retrieved, hasConfig := mgr.GetConfig()
 		assert.True(t, hasConfig)
 		assert.Equal(t, url, retrieved.URL)
@@ -48,7 +48,7 @@ func TestUpdateConfigMultipleTimes(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 	mgr := NewManager()
-	
+
 	// Start multiple goroutines writing
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
@@ -58,12 +58,12 @@ func TestConcurrentAccess(t *testing.T) {
 			done <- true
 		}(i)
 	}
-	
+
 	// Wait for all writes
 	for i := 0; i < 10; i++ {
 		<-done
 	}
-	
+
 	// Verify we can still read
 	retrieved, hasConfig := mgr.GetConfig()
 	assert.True(t, hasConfig)

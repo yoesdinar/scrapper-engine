@@ -38,8 +38,8 @@ deps: ## Download dependencies
 	cd worker && go mod download
 
 swagger: ## Generate Swagger docs
-	cd controller && swag init -g cmd/main.go -o docs
-	cd worker && swag init -g cmd/main.go -o docs
+	swag init -g controller/cmd/main.go -o controller/docs --parseDependency --parseInternal
+	swag init -g worker/cmd/main.go -o worker/docs --parseDependency --parseInternal
 
 run-controller: ## Run controller service
 	cd controller && go run ./cmd

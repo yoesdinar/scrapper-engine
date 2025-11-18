@@ -136,9 +136,7 @@ func (h *Handler) GetConfig(c *gin.Context) {
 		return
 	}
 
-	// Set ETag header with version
 	c.Header("ETag", strconv.FormatInt(config.Version, 10))
-
 	c.JSON(http.StatusOK, config)
 }
 
@@ -164,7 +162,6 @@ func (h *Handler) UpdateConfig(c *gin.Context) {
 		return
 	}
 
-	// Get poll interval from query or use default
 	pollInterval := h.pollInterval
 	if pi := c.Query("poll_interval"); pi != "" {
 		if val, err := strconv.Atoi(pi); err == nil && val > 0 {

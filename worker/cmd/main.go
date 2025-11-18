@@ -13,6 +13,8 @@ import (
 	"github.com/doniyusdinar/config-management/worker/internal/api"
 	"github.com/doniyusdinar/config-management/worker/internal/config"
 	"github.com/doniyusdinar/config-management/worker/internal/proxy"
+
+	_ "github.com/doniyusdinar/config-management/worker/docs"
 )
 
 // @title Configuration Management Worker API
@@ -31,31 +33,23 @@ import (
 // @schemes http https
 
 func main() {
-	// Initialize logger
 	logLevel := getEnv("LOG_LEVEL", "info")
 	logger.SetLevel(logLevel)
 	logger.Log.Info("Starting Configuration Management Worker")
 
-	// Get configuration from environment
 	port := getEnv("PORT", "8082")
 
-	// Initialize config manager and proxy
 	configMgr := config.NewManager()
 	proxyClient := proxy.NewProxy()
 
-	// Initialize API handler
 	handler := api.NewHandler(configMgr, proxyClient)
-
-	// Setup router
 	router := api.SetupRouter(handler)
 
-	// Create HTTP server
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
 		Handler: router,
 	}
 
-	// Start server in a goroutine
 	go func() {
 		logger.Log.Infof("Worker listening on port %s", port)
 		logger.Log.Infof("Swagger docs available at http://localhost:%s/swagger/index.html", port)
@@ -64,14 +58,12 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	logger.Log.Info("Shutting down server...")
 
-	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

@@ -9,11 +9,11 @@ type WorkerConfig struct {
 
 // Config represents a configuration version stored in the database
 type Config struct {
-	ID        int64         `json:"id"`
-	Version   int64         `json:"version"`
-	Data      WorkerConfig  `json:"data"`
-	CreatedAt time.Time     `json:"created_at"`
-	UpdatedAt time.Time     `json:"updated_at"`
+	ID        int64        `json:"id"`
+	Version   int64        `json:"version"`
+	Data      WorkerConfig `json:"data"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
 }
 
 // ConfigResponse represents the response when fetching config

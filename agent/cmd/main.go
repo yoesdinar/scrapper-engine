@@ -19,7 +19,6 @@ import (
 )
 
 func main() {
-	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		logger.Log.Fatalf("Failed to load config: %v", err)
@@ -28,11 +27,9 @@ func main() {
 	logger.SetLevel(cfg.LogLevel)
 	logger.Log.Info("Starting Configuration Management Agent")
 
-	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Register with controller
 	agentID, pollURL, pollInterval, err := registerWithController(cfg)
 	if err != nil {
 		logger.Log.Fatalf("Failed to register with controller: %v", err)
@@ -41,20 +38,15 @@ func main() {
 	logger.Log.Infof("Registered with controller - Agent ID: %s", agentID)
 	logger.Log.Infof("Poll URL: %s, Interval: %d seconds", pollURL, pollInterval)
 
-	// Initialize worker manager
 	workerMgr := worker.NewManager(cfg.WorkerURL)
-
-	// Initialize poller
 	p := poller.NewPoller(cfg.ControllerURL, cfg.ControllerUsername, cfg.ControllerPassword, workerMgr, cfg.CacheFile)
 
-	// Start polling in goroutine
 	go func() {
 		if err := p.Start(ctx); err != nil {
 			logger.Log.Errorf("Poller error: %v", err)
 		}
 	}()
 
-	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

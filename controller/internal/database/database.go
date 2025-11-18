@@ -21,7 +21,6 @@ func New(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Enable WAL mode for better concurrency
 	if _, err := conn.Exec("PRAGMA journal_mode=WAL;"); err != nil {
 		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
 	}
@@ -70,7 +69,6 @@ func (db *DB) migrate() error {
 		return fmt.Errorf("failed to create schema: %w", err)
 	}
 
-	// Initialize active_config if it doesn't exist
 	var count int
 	err := db.conn.QueryRow("SELECT COUNT(*) FROM active_config").Scan(&count)
 	if err != nil {
@@ -146,7 +144,6 @@ func (db *DB) UpdateConfig(config models.WorkerConfig, pollInterval int) (int64,
 		return 0, fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	// Get current version
 	var currentVersion int64
 	err = db.conn.QueryRow("SELECT version FROM active_config WHERE id = 1").Scan(&currentVersion)
 	if err != nil {
@@ -155,7 +152,6 @@ func (db *DB) UpdateConfig(config models.WorkerConfig, pollInterval int) (int64,
 
 	newVersion := currentVersion + 1
 
-	// Update active config
 	_, err = db.conn.Exec(`
 		UPDATE active_config 
 		SET version = ?, config_data = ?, poll_interval_seconds = ?, updated_at = ?
@@ -165,7 +161,6 @@ func (db *DB) UpdateConfig(config models.WorkerConfig, pollInterval int) (int64,
 		return 0, err
 	}
 
-	// Store in history
 	_, err = db.conn.Exec(`
 		INSERT INTO configurations (version, config_data, created_at)
 		VALUES (?, ?, ?)

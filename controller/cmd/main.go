@@ -12,6 +12,8 @@ import (
 	"github.com/doniyusdinar/config-management/controller/internal/api"
 	"github.com/doniyusdinar/config-management/controller/internal/database"
 	"github.com/doniyusdinar/config-management/pkg/logger"
+
+	_ "github.com/doniyusdinar/config-management/controller/docs"
 )
 
 // @title Configuration Management Controller API
@@ -32,16 +34,13 @@ import (
 // @securityDefinitions.basic BasicAuth
 
 func main() {
-	// Initialize logger
 	logLevel := getEnv("LOG_LEVEL", "info")
 	logger.SetLevel(logLevel)
 	logger.Log.Info("Starting Configuration Management Controller")
 
-	// Get configuration from environment
 	dbPath := getEnv("DB_PATH", "./controller.db")
 	port := getEnv("PORT", "8080")
 
-	// Initialize database
 	db, err := database.New(dbPath)
 	if err != nil {
 		logger.Log.Fatalf("Failed to initialize database: %v", err)
@@ -50,19 +49,14 @@ func main() {
 
 	logger.Log.Info("Database initialized successfully")
 
-	// Initialize API handler
 	handler := api.NewHandler(db)
-
-	// Setup router
 	router := api.SetupRouter(handler)
 
-	// Create HTTP server
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
 		Handler: router,
 	}
 
-	// Start server in a goroutine
 	go func() {
 		logger.Log.Infof("Controller listening on port %s", port)
 		logger.Log.Infof("Swagger docs available at http://localhost:%s/swagger/index.html", port)
@@ -71,14 +65,12 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	logger.Log.Info("Shutting down server...")
 
-	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

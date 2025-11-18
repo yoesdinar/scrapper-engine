@@ -45,7 +45,6 @@ func NewPoller(controllerURL, username, password string, workerMgr *worker.Manag
 
 // Start starts the polling loop
 func (p *Poller) Start(ctx context.Context) error {
-	// Try to load cached config on startup
 	if err := p.loadCache(); err != nil {
 		logger.Log.Warnf("Failed to load cache: %v", err)
 	}
@@ -68,7 +67,6 @@ func (p *Poller) Start(ctx context.Context) error {
 			if err := p.poll(ctx); err != nil {
 				logger.Log.Errorf("Poll failed: %v", err)
 
-				// Use exponential backoff for retry
 				backoffDuration := p.backoff.Next()
 				logger.Log.Infof("Retrying in %v", backoffDuration)
 
@@ -78,7 +76,6 @@ func (p *Poller) Start(ctx context.Context) error {
 					return nil
 				}
 			} else {
-				// Reset backoff on successful poll
 				p.backoff.Reset()
 			}
 		}
@@ -119,24 +116,20 @@ func (p *Poller) poll(ctx context.Context) error {
 		return fmt.Errorf("failed to decode config: %w", err)
 	}
 
-	// Check if version changed
 	if configResp.Version != p.currentVersion {
 		logger.Log.Infof("Configuration changed: version %d -> %d", p.currentVersion, configResp.Version)
 		p.currentVersion = configResp.Version
 
-		// Forward to worker
 		if err := p.workerMgr.ForwardConfig(configResp.Data); err != nil {
 			logger.Log.Errorf("Failed to forward config to worker: %v", err)
 			return err
 		}
 
-		// Save to cache
 		if err := p.saveCache(configResp); err != nil {
 			logger.Log.Warnf("Failed to save cache: %v", err)
 		}
 	}
 
-	// Update poll interval if it changed
 	if configResp.PollIntervalSecs > 0 {
 		newInterval := time.Duration(configResp.PollIntervalSecs) * time.Second
 		if newInterval != p.pollInterval {
@@ -164,7 +157,6 @@ func (p *Poller) loadCache() error {
 
 	p.currentVersion = configResp.Version
 
-	// Forward cached config to worker
 	if err := p.workerMgr.ForwardConfig(configResp.Data); err != nil {
 		return err
 	}
