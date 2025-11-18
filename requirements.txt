@@ -1,0 +1,239 @@
+Distributed Configuration Management
+Overview
+Implement a distributed configuration management using Golang with the following components:
+* Controller: Central configuration management service
+* Agent: Configuration receiver and worker manager
+* Worker: HTTP service that executes configured tasks
+________________
+
+
+Architecture Components
+1. Controller Service
+The Controller acts as the central hub for configuration management and agent registration.
+Responsibilities
+Configuration Management:
+1. Accept configuration updates from administrators via API
+2. Persist configurations in a database (simple SQLite is also acceptable)
+3. Make configurations available for agents to poll
+4. Track configuration versions to detect changes
+5. Single configuration applies to all registered agents
+Agent Registration:
+1. Provide a protected registration endpoint (static credentials acceptable)
+2. Authenticate incoming agent registration requests
+3. Generate unique agent IDs for registered agents
+Post-Registration Actions:
+When a new agent registers, the Controller must:
+1. Generate Unique Agent ID: Create a unique identifier for the agent (use UUID)
+2. Store Agent Information: Persist agent registration details in the database
+3. Create Initial Configuration: Store default or latest configuration for the agent
+4. Return Connection Details, respond with:
+   * Agent ID (unique identifier)
+   * Poll endpoint URL
+   * Polling interval (in second unit)
+API Endpoints
+POST /register
+1. Authentication: Required (static credentials for the agent to register)
+2. Request: Agent identification information
+3. Response example:
+json
+ {
+    "agent_id": "uuid-here",
+    "poll_url": "/config",
+    "poll_interval_seconds": 30
+  }
+
+
+POST /config
+1. Authentication: Required (for administrator)
+2. Request: New configuration data
+3. Response: Success confirmation
+4. Action: Updates global configuration version, applied to all agents
+
+
+GET /config
+1. Authentication: Required (agent credentials, can use credential used by agent to register itself)
+2. Response: Current worker configuration (same for all agents)
+3. Headers: Include ETag or version for change detection
+4. Behavior: Returns the latest global configuration
+
+
+
+
+________________
+
+
+2. Agent Service
+The Agent acts as a bridge between the Controller and the Worker, managing configuration synchronization.
+Responsibilities
+Startup Sequence:
+1. Read local configuration file / environment variables containing:
+   1. Controller URL
+   2. Authentication credentials to the controller
+2. Register with the Controller via /register endpoint
+3. Receive agent ID and polling details from Controller response
+4. Start polling loop
+Configuration Synchronization:
+1. Periodically poll the Controller's /config endpoint
+2. Compare received configuration with cached version
+3. Detect configuration changes using version/ETag comparison
+4. Make sure that the polling interval always up to date with the configuration from the Controller (the polling interval can be changed dynamically on runtime based on controller response)
+Architecture Components:
+The Agent contains two main subsystems:
+1. Controller-Poller:
+   1. Maintains periodic connection to the Controller
+   2. Polls for configuration updates at regular intervals
+   3. Detects configuration changes
+   4. Caches current configuration and its version
+2. Worker-Manager:
+   1. Forwards received configurations to the Worker via /config endpoint
+   2. Only sends updates when configuration has changed
+   3. Manages Worker lifecycle (optional. Worker lifecycle can be managed outside of agent)
+Configuration Flow
+Controller ← Agent (Controller-Poller polls) → Agent forwards to Worker (/config endpoint)
+
+
+________________
+
+
+3. Worker Service
+The Worker is an HTTP service that executes tasks based on dynamically received configurations.
+Responsibilities
+Configuration Management:
+1. Start with empty/default configuration
+2. Accept configuration updates via /config endpoint from the Agent
+3. Store and apply the latest configuration
+4. Log configuration changes to console
+Configuration Structure:
+{
+  "url": "https://example.com/api/endpoint"
+}
+
+
+Task Execution:
+1. Expose /hit endpoint for external requests
+2. On request to /hit:
+   1. Read the current configuration
+   2. Execute HTTP GET request to the configured URL
+   3. Return the response body to the caller
+API Endpoints
+POST /config
+- Caller: Agent
+- Request: Worker configuration (JSON)
+- Response: Success confirmation
+- Action: Logs new configuration to console
+
+
+GET /hit
+- Caller: External user
+- Response: Result from configured URL
+- Behavior: Executes GET request to configured URL and proxies response
+
+
+________________
+
+
+Complete Flow Example
+Step-by-Step Execution
+1. Controller Initialization
+   1. Controller service starts
+   2. Connects to database
+   3. Starts HTTP API server
+2. Agent Registration
+   1. Agent service starts
+   2. Reads controller URL and credentials from config file / environment variables
+   3. Sends registration request to Controller
+3. Controller Response
+   1. Controller generates unique agent ID
+   2. Stores agent registration in database
+   3. Returns agent ID and polling configuration to agent
+4. Agent Polling Loop
+   1. Agent starts periodic polling based on controller’s response (e.g., every 30 seconds)
+   2. Sends GET request to /config
+   3. Receives current global configuration with version/ETag
+   4. Compares with cached version
+5. Configuration Change Detection
+   1. If configuration has changed:
+      1. Agent updates its cached version
+      2. Agent forwards new configuration to Worker
+6. Worker Configuration
+   1. Agent starts Worker (if not already running) (optional, worker lifecycle can be managed externally)
+   2. Sends configuration to Worker via POST /config
+   3. Worker logs the new configuration
+7. Task Execution
+   1. User executes: curl http://<worker-url>/hit
+   2. Worker reads current configuration
+   3. Worker sends: GET <configured-url>
+   4. Worker returns response to user
+Example
+Configuration:
+{
+  "url": "https://ip.me"
+}
+
+
+User Request:
+curl http://worker.local:8080/hit
+
+
+Worker Behavior:
+1. Reads current configuration: url = "https://ip.me"
+2. Executes: GET https://ip.me
+3. Receives response: 1.2.3.4 (user's public IP)
+4. Returns to user: 1.2.3.4
+________________
+
+
+Architecture Diagram
+  
+
+Bonus Requirements
+Be Creative and enhance the system architecture
+If you have better idea about how the controller can distribute the configuration to a huge number of agents, please implement it as long as the main goal is still the same.
+Implement Exponential Backoff when retrieving config from the controller
+If the agent cannot retrieve configuration from the controller, implement retry with Exponential Backoff (can be different with poll interval). Agent and worker must continue operating with the existing configuration if the controller is not available.
+Containerization
+Dockerize all services:
+Controller:
+1. Standalone Docker Compose configuration
+2. Includes Controller service and database (if using separate DB)
+3. Proper volume mounting for persistence
+Agent + Worker:
+1. Combined Docker Compose configuration
+2. Both services in the same compose file
+3. Proper networking between Agent and Worker
+4. Environment variables for Controller URL
+API doc in swagger generated automatically from the code
+Generate Swagger/OpenAPI documentation automatically from the code
+Include all endpoints with request/response examples
+
+
+All stack deployed in real server
+Deploy all services in the real server accessible from public, and write the details in the docs.
+
+
+________________
+
+
+Technical Requirements
+Language and Tools
+* Programming Language: Golang
+* Database: any familiar database (sqlite is fine)
+________________
+
+
+Deliverables
+1. Source Code
+   * Complete implementation of Controller, Agent, and Worker
+   * Clear project structure
+   * Proper error handling
+   * Configuration management (files or environment variables)
+2. Documentation
+   * README.md with compile and setup instructions
+   * API documentation (swaggerfile, if implemented)
+   * Configuration examples
+   * Architecture explanation (if you implement it differently)
+3. Docker Configuration (if implemented)
+   * Docker Compose files for each component
+   * Dockerfiles for each service
+   * Environment variable documentation
+________________
