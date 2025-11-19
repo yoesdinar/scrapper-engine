@@ -1,31 +1,26 @@
 # Build stage
 FROM golang:1.21-alpine AS builder
 
-WORKDIR /build
+WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
-COPY ../pkg/go.mod ../pkg/go.sum ../pkg/
+COPY worker/go.mod worker/go.sum ./worker/
+COPY pkg/ ./pkg/
 
-# Download dependencies
+WORKDIR /app/worker
 RUN go mod download
 
-# Copy source code
-COPY . .
-COPY ../pkg ../pkg
+COPY worker/ .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o worker ./cmd
+RUN CGO_ENABLED=0 go build -o worker ./cmd
 
 # Runtime stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates curl
 
 WORKDIR /app
 
-# Copy the binary from builder
-COPY --from=builder /build/worker .
+COPY --from=builder /app/worker/worker .
 
 # Expose port
 EXPOSE 8082

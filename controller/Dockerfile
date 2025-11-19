@@ -1,33 +1,35 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.21-bookworm AS builder
 
-WORKDIR /build
-
-# Copy go mod files
-COPY go.mod go.sum ./
-COPY ../pkg/go.mod ../pkg/go.sum ../pkg/
-
-# Download dependencies
-RUN go mod download
-
-# Copy source code
-COPY . .
-COPY ../pkg ../pkg
-
-# Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o controller ./cmd
-
-# Runtime stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates sqlite
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy the binary from builder
-COPY --from=builder /build/controller .
+COPY controller/go.mod controller/go.sum ./controller/
+COPY pkg/ ./pkg/
 
-# Create directory for database
+WORKDIR /app/controller
+RUN go mod download
+
+COPY controller/ .
+
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o controller ./cmd
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/controller/controller .
+
 RUN mkdir -p /app/data
 
 # Expose port

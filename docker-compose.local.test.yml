@@ -1,0 +1,170 @@
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: controller/Dockerfile
+    container_name: config-controller
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/controller.db
+      - AGENT_USERNAME=agent
+      - AGENT_PASSWORD=agent123
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin123
+      - LOG_LEVEL=info
+    volumes:
+      - controller-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - config-net
+
+  worker1:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: config-worker1
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - config-net
+
+  worker2:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: config-worker2
+    ports:
+      - "8083:8082"
+    environment:
+      - PORT=8082
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - config-net
+
+  worker3:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: config-worker3
+    ports:
+      - "8084:8082"
+    environment:
+      - PORT=8082
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - config-net
+
+  agent1:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: config-agent1
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=agent123
+      - WORKER_URL=http://worker1:8082
+      - CACHE_FILE=/app/cache/agent_config.cache
+      - LOG_LEVEL=info
+    volumes:
+      - agent1-cache:/app/cache
+    depends_on:
+      controller:
+        condition: service_healthy
+      worker1:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - config-net
+
+  agent2:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: config-agent2
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=agent123
+      - WORKER_URL=http://worker2:8082
+      - CACHE_FILE=/app/cache/agent_config.cache
+      - LOG_LEVEL=info
+    volumes:
+      - agent2-cache:/app/cache
+    depends_on:
+      controller:
+        condition: service_healthy
+      worker2:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - config-net
+
+  agent3:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: config-agent3
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=agent123
+      - WORKER_URL=http://worker3:8082
+      - CACHE_FILE=/app/cache/agent_config.cache
+      - LOG_LEVEL=info
+    volumes:
+      - agent3-cache:/app/cache
+    depends_on:
+      controller:
+        condition: service_healthy
+      worker3:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - config-net
+
+volumes:
+  controller-data:
+    driver: local
+  agent1-cache:
+    driver: local
+  agent2-cache:
+    driver: local
+  agent3-cache:
+    driver: local
+
+networks:
+  config-net:
+    driver: bridge
