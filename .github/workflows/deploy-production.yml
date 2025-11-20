@@ -119,10 +119,7 @@ jobs:
           script: |
             cd /root/config-management
             
-            # Log in to GitHub Container Registry
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
-            # Pull new images
+            # Pull new images (public images, no login needed)
             export IMAGE_TAG=${{ steps.version.outputs.VERSION }}
             export REGISTRY=${{ env.REGISTRY }}
             export IMAGE_PREFIX=${{ env.IMAGE_PREFIX }}
