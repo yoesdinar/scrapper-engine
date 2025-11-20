@@ -52,7 +52,6 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
             type=raw,value=latest
 
       - name: Build and push ${{ matrix.service.name }}
