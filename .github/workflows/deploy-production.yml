@@ -82,8 +82,16 @@ jobs:
         run: |
           mkdir -p deploy
           cp docker-compose.production.yml deploy/
-          cp -r nginx deploy/
-          cp -r scripts deploy/
+          
+          # Copy nginx config if exists
+          if [ -d "nginx" ]; then
+            cp -r nginx deploy/
+          fi
+          
+          # Copy scripts if exists
+          if [ -d "scripts" ]; then
+            cp -r scripts deploy/
+          fi
           
           # Create .env file with image version
           cat > deploy/.env << EOF
