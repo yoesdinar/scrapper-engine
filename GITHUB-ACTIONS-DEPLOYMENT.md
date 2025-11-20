@@ -17,9 +17,9 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 
 Add these secrets:
 
-- **`PROD_HOST`**: `103.157.116.91`
-- **`PROD_USERNAME`**: `root`
-- **`PROD_PASSWORD`**: `g!+D7^PCoz`
+- **`PROD_HOST`**: Your production server IP address
+- **`PROD_USERNAME`**: Your production server username (e.g., `root`)
+- **`PROD_PASSWORD`**: Your production server password
 
 ### 2. Enable GitHub Container Registry
 

@@ -10,27 +10,32 @@
    - **Token name**: `Production Server GHCR Access`
    - **Expiration**: `No expiration` (or choose appropriate duration)
    - **Repository access**: Select "Only select repositories" → Choose `scrapper-engine`
-   - **Permissions**:
-     - Repository permissions:
+   - **Permissions** - Scroll down to find these sections:
+     - **Repository permissions** (expand this section):
        - ✅ **Contents**: Read-only (to read repository)
        - ✅ **Metadata**: Read-only (automatically selected)
-     - Account permissions:
-       - ✅ **Packages**: Read (to pull container images)
-4. Click "Generate token"
+     - **Account permissions** (scroll down further, separate section at the bottom):
+       - ✅ **Packages**: Read (IMPORTANT: This is under Account permissions, not Repository!)
+4. Click "Generate token" at the bottom
 5. **Copy the token immediately** (you won't see it again!)
 
-### Option B: Classic Personal Access Token
+**Note:** If you can't find "Packages" under Account permissions in fine-grained tokens, use Option B (Classic Token) instead - it's simpler and works perfectly for this use case.
+
+### Option B: Classic Personal Access Token (Easier - Recommended if Option A is confusing)
 
 1. Go to https://github.com/settings/tokens
 2. Click "Generate new token" → "Generate new token (classic)"
 3. Configure:
    - **Note**: `Production Server GHCR Access`
    - **Expiration**: `No expiration` (or choose duration)
-   - **Scopes**: Select these:
+   - **Select scopes** - Check these boxes:
      - ✅ `read:packages` - Download packages from GitHub Package Registry
-     - ✅ `repo` (if private repo) - Full control of private repositories
-4. Click "Generate token"
-5. **Copy the token immediately**
+     - ✅ `write:packages` - Upload packages to GitHub Package Registry (optional, for pushing)
+     - ✅ `repo` - Full control of private repositories (needed for private repos)
+4. Click "Generate token" at the bottom
+5. **Copy the token immediately** (you won't see it again!)
+
+**This is the simpler option and works perfectly for pulling private container images!**
 
 ## Step 2: Add Token to GitHub Secrets
 
@@ -46,9 +51,9 @@
 
 Make sure you have all these secrets configured:
 
-- ✅ `PROD_HOST` = `103.157.116.91`
-- ✅ `PROD_USERNAME` = `root`
-- ✅ `PROD_PASSWORD` = `g!+D7^PCoz`
+- ✅ `PROD_HOST` = Your production server IP
+- ✅ `PROD_USERNAME` = Your production server username
+- ✅ `PROD_PASSWORD` = Your production server password
 - ✅ `GHCR_TOKEN` = Your GitHub Personal Access Token
 
 ## Step 4: Test the Setup
@@ -73,7 +78,7 @@ You can test the token manually on your production server:
 
 ```bash
 # SSH to production
-ssh root@103.157.116.91
+ssh root@YOUR_SERVER_IP
 
 # Login to GHCR with your token
 echo "YOUR_TOKEN_HERE" | docker login ghcr.io -u yoesdinar --password-stdin
@@ -142,7 +147,7 @@ When your token expires or needs rotation:
 2. Update the `GHCR_TOKEN` secret in GitHub
 3. Optionally, update on production server:
    ```bash
-   ssh root@103.157.116.91
+   ssh root@YOUR_SERVER_IP
    echo "NEW_TOKEN" | docker login ghcr.io -u yoesdinar --password-stdin
    ```
 
