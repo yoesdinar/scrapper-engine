@@ -201,18 +201,14 @@ func (nd *NatsDistributor) Start(ctx context.Context) error {
 		subject = "config.worker.update"
 	}
 
-	queueGroup := nd.config.QueueGroup
-	if queueGroup == "" {
-		queueGroup = "config-workers"
-	}
-
+	// Use regular subscription (not queue group) so ALL agents receive ALL config updates
 	var err error
-	nd.subscription, err = nd.natsClient.QueueSubscribe(subject, queueGroup, nd.handleNatsMessage)
+	nd.subscription, err = nd.natsClient.Subscribe(subject, nd.handleNatsMessage)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to NATS subject %s: %w", subject, err)
 	}
 
-	logger.Log.Infof("NATS subscriber started on subject: %s, queue: %s", subject, queueGroup)
+	logger.Log.Infof("NATS subscriber started on subject: %s (broadcast mode)", subject)
 
 	// Wait for context cancellation
 	<-ctx.Done()
