@@ -73,7 +73,7 @@ services:
     ports:
       - "8085:80"   # Single endpoint for external clients: /worker/hit
     volumes:
-      - ./nginx/external-lb.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
       - config_management
     depends_on:
