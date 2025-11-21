@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  # NATS server for configuration distribution
+  nats:
+    image: nats:2.10-alpine
+    container_name: nats-server
+    ports:
+      - "4222:4222"
+    networks:
+      - config_management
+
+  # Controller service
+  controller:
+    build:
+      context: .
+      dockerfile: controller/Dockerfile
+    container_name: controller
+    ports:
+      - "8080:8080"
+    environment:
+      - DISTRIBUTION_STRATEGY=NATS
+      - NATS_URL=nats://nats:4222
+    networks:
+      - config_management
+    depends_on:
+      - nats
+
+  # Worker instances (direct access for agents)
+  worker1:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: worker1
+    ports:
+      - "8082:8082"  # Direct access for agent1
+    environment:
+      - PORT=8082
+      - WORKER_ID=worker1
+    networks:
+      - config_management
+
+  worker2:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: worker2
+    ports:
+      - "8083:8082"  # Direct access for agent2
+    environment:
+      - PORT=8082
+      - WORKER_ID=worker2
+    networks:
+      - config_management
+
+  worker3:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: worker3
+    ports:
+      - "8084:8082"  # Direct access for agent3
+    environment:
+      - PORT=8082
+      - WORKER_ID=worker3
+    networks:
+      - config_management
+
+  # Load balancer for external client traffic ONLY
+  external-lb:
+    image: nginx:alpine
+    container_name: external-loadbalancer
+    ports:
+      - "8080:80"   # Single endpoint for external clients: /worker/hit
+    volumes:
+      - ./nginx/external-lb.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - config_management
+    depends_on:
+      - worker1
+      - worker2
+      - worker3
+
+  # Agents with direct 1:1 worker connections
+  agent1:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: agent1
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - WORKER_URL=http://worker1:8082  # Direct connection
+      - DISTRIBUTION_STRATEGY=NATS
+      - NATS_URL=nats://nats:4222
+    networks:
+      - config_management
+    depends_on:
+      - controller
+      - worker1
+
+  agent2:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: agent2
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - WORKER_URL=http://worker2:8082  # Direct connection
+      - DISTRIBUTION_STRATEGY=NATS
+      - NATS_URL=nats://nats:4222
+    networks:
+      - config_management
+    depends_on:
+      - controller
+      - worker2
+
+  agent3:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: agent3
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - WORKER_URL=http://worker3:8082  # Direct connection
+      - DISTRIBUTION_STRATEGY=NATS
+      - NATS_URL=nats://nats:4222
+    networks:
+      - config_management
+    depends_on:
+      - controller
+      - worker3
+
+networks:
+  config_management:
+    driver: bridge
