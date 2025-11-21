@@ -146,8 +146,13 @@ jobs:
             # Stop existing services gracefully
             docker compose down --remove-orphans
             
-            # Pull latest images
-            docker compose pull
+            # Remove old images to force rebuild
+            echo "🗑️ Cleaning old images..."
+            docker images | grep config-management | awk '{print $3}' | xargs -r docker rmi -f || true
+            
+            # Build new images with latest code
+            echo "🔨 Building new images..."
+            docker compose build --no-cache
             
             # Start services in order: NATS -> Controller -> Workers -> Load Balancer -> Agents
             echo "📡 Starting NATS server..."
@@ -181,7 +186,7 @@ jobs:
             fi
             
             # Check external load balancer
-            if curl -f http://localhost:8085/health >/dev/null 2>&1; then
+            if curl -f http://localhost:80/health >/dev/null 2>&1; then
               echo "✅ External Load Balancer: Healthy"
             else
               echo "❌ External Load Balancer: Failed"
@@ -206,7 +211,7 @@ jobs:
             echo ""
             echo "🔗 Production Endpoints:"
             echo "  - Controller API: http://$(hostname):8080"
-            echo "  - External Load Balancer: http://$(hostname):8085/worker/*"
+            echo "  - External Load Balancer: http://$(hostname):80/worker/*"
             echo "  - Worker1 Direct: http://$(hostname):8082"
             echo "  - Worker2 Direct: http://$(hostname):8083"
             echo "  - Worker3 Direct: http://$(hostname):8084"
