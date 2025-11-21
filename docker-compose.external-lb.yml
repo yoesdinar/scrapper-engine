@@ -21,6 +21,12 @@ services:
     environment:
       - DISTRIBUTION_STRATEGY=NATS
       - NATS_URL=nats://nats:4222
+      - NATS_SUBJECT=config.worker.update
+      - NATS_QUEUE_GROUP=config-workers
+      - AGENT_USERNAME=agent
+      - AGENT_PASSWORD=prod-secret-123
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin-prod-456
     networks:
       - config_management
     depends_on:
@@ -92,11 +98,16 @@ services:
       - WORKER_URL=http://worker1:8082  # Direct connection
       - DISTRIBUTION_STRATEGY=NATS
       - NATS_URL=nats://nats:4222
+      - NATS_SUBJECT=config.worker.update
+      - NATS_QUEUE_GROUP=config-workers
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=prod-secret-123
     networks:
       - config_management
     depends_on:
       - controller
       - worker1
+      - nats
 
   agent2:
     build:
@@ -108,11 +119,16 @@ services:
       - WORKER_URL=http://worker2:8082  # Direct connection
       - DISTRIBUTION_STRATEGY=NATS
       - NATS_URL=nats://nats:4222
+      - NATS_SUBJECT=config.worker.update
+      - NATS_QUEUE_GROUP=config-workers
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=prod-secret-123
     networks:
       - config_management
     depends_on:
       - controller
       - worker2
+      - nats
 
   agent3:
     build:
@@ -124,11 +140,16 @@ services:
       - WORKER_URL=http://worker3:8082  # Direct connection
       - DISTRIBUTION_STRATEGY=NATS
       - NATS_URL=nats://nats:4222
+      - NATS_SUBJECT=config.worker.update
+      - NATS_QUEUE_GROUP=config-workers
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=prod-secret-123
     networks:
       - config_management
     depends_on:
       - controller
       - worker3
+      - nats
 
 networks:
   config_management:
