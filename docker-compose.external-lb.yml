@@ -12,7 +12,7 @@ services:
 
   # Controller service
   controller:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar}/config-management-controller:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar/scrapper-engine}-controller:${IMAGE_TAG:-latest}
     container_name: controller
     ports:
       - "8080:8080"
@@ -32,7 +32,7 @@ services:
 
   # Worker instances (direct access for agents)
   worker1:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar}/config-management-worker:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar/scrapper-engine}-worker:${IMAGE_TAG:-latest}
     container_name: worker1
     ports:
       - "8082:8082"  # Direct access for agent1
@@ -43,7 +43,7 @@ services:
       - config_management
 
   worker2:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar}/config-management-worker:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar/scrapper-engine}-worker:${IMAGE_TAG:-latest}
     container_name: worker2
     ports:
       - "8083:8082"  # Direct access for agent2
@@ -54,7 +54,7 @@ services:
       - config_management
 
   worker3:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar}/config-management-worker:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar/scrapper-engine}-worker:${IMAGE_TAG:-latest}
     container_name: worker3
     ports:
       - "8084:8082"  # Direct access for agent3
@@ -81,7 +81,7 @@ services:
 
   # Agents with direct 1:1 worker connections
   agent1:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar}/config-management-agent:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar/scrapper-engine}-agent:${IMAGE_TAG:-latest}
     container_name: agent1
     environment:
       - CONTROLLER_URL=http://controller:8080
@@ -100,7 +100,7 @@ services:
       - nats
 
   agent2:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar}/config-management-agent:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar/scrapper-engine}-agent:${IMAGE_TAG:-latest}
     container_name: agent2
     environment:
       - CONTROLLER_URL=http://controller:8080
@@ -119,7 +119,7 @@ services:
       - nats
 
   agent3:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar}/config-management-agent:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-yoesdinar/scrapper-engine}-agent:${IMAGE_TAG:-latest}
     container_name: agent3
     environment:
       - CONTROLLER_URL=http://controller:8080
