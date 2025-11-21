@@ -146,13 +146,13 @@ jobs:
             # Stop existing services gracefully
             docker compose down --remove-orphans
             
-            # Remove old images to force rebuild
+            # Remove old images
             echo "🗑️ Cleaning old images..."
             docker images | grep config-management | awk '{print $3}' | xargs -r docker rmi -f || true
             
-            # Build new images with latest code
-            echo "🔨 Building new images..."
-            docker compose build --no-cache
+            # Pull latest images from GHCR
+            echo "📥 Pulling images from GitHub Container Registry..."
+            docker compose pull
             
             # Start services in order: NATS -> Controller -> Workers -> Load Balancer -> Agents
             echo "📡 Starting NATS server..."
