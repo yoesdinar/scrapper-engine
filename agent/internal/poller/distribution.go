@@ -2,6 +2,7 @@ package poller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/doniyusdinar/config-management/pkg/logger"
 	"github.com/doniyusdinar/config-management/pkg/models"
 	"github.com/doniyusdinar/config-management/pkg/redis"
+	natspkg "github.com/doniyusdinar/config-management/pkg/nats"
+	"github.com/nats-io/nats.go"
 )
 
 // DistributionStrategy represents the config distribution strategy
@@ -17,8 +20,8 @@ type DistributionStrategy string
 const (
 	StrategyPoller DistributionStrategy = "POLLER"
 	StrategyRedis  DistributionStrategy = "REDIS"
+	StrategyNats   DistributionStrategy = "NATS"
 	// Future strategies:
-	// StrategyNats   DistributionStrategy = "NATS"
 	// StrategyKafka  DistributionStrategy = "KAFKA"
 )
 
@@ -157,6 +160,129 @@ func (rd *RedisDistributor) GetLastVersion() string {
 	return rd.lastVersion
 }
 
+// NatsDistributor implements NATS pub/sub strategy
+type NatsDistributor struct {
+	natsClient  *natspkg.Client
+	workerMgr   *worker.Manager
+	ctx         context.Context
+	cancel      context.CancelFunc
+	mu          sync.RWMutex
+	lastConfig  *models.WorkerConfig
+	lastVersion string
+	subscription *nats.Subscription
+	config      natspkg.Config
+}
+
+func NewNatsDistributor(natsConfig natspkg.Config, workerMgr *worker.Manager) (*NatsDistributor, error) {
+	natsClient := natspkg.NewClient(natsConfig)
+	
+	err := natsClient.Connect()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	return &NatsDistributor{
+		natsClient: natsClient,
+		workerMgr:  workerMgr,
+		ctx:        ctx,
+		cancel:     cancel,
+		config:     natsConfig,
+	}, nil
+}
+
+func (nd *NatsDistributor) Start(ctx context.Context) error {
+	logger.Log.Info("Starting NATS pub/sub distribution strategy")
+
+	// Subscribe to NATS config changes
+	subject := nd.config.Subject
+	if subject == "" {
+		subject = "config.worker.update"
+	}
+
+	queueGroup := nd.config.QueueGroup
+	if queueGroup == "" {
+		queueGroup = "config-workers"
+	}
+
+	var err error
+	nd.subscription, err = nd.natsClient.QueueSubscribe(subject, queueGroup, nd.handleNatsMessage)
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to NATS subject %s: %w", subject, err)
+	}
+
+	logger.Log.Infof("NATS subscriber started on subject: %s, queue: %s", subject, queueGroup)
+
+	// Wait for context cancellation
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (nd *NatsDistributor) handleNatsMessage(msg *nats.Msg) {
+	logger.Log.Debugf("Received NATS message: %s", string(msg.Data))
+
+	var configMsg struct {
+		Version string              `json:"version"`
+		Config  models.WorkerConfig `json:"config"`
+	}
+
+	if err := json.Unmarshal(msg.Data, &configMsg); err != nil {
+		logger.Log.Errorf("Failed to unmarshal NATS config message: %v", err)
+		return
+	}
+
+	nd.mu.Lock()
+	defer nd.mu.Unlock()
+
+	// Check if this is a new version
+	if configMsg.Version != nd.lastVersion {
+		nd.lastConfig = &configMsg.Config
+		nd.lastVersion = configMsg.Version
+
+		logger.Log.Infof("Received new config from NATS: version %s", configMsg.Version)
+
+		// Forward to worker
+		if err := nd.workerMgr.ForwardConfig(configMsg.Config); err != nil {
+			logger.Log.Errorf("Failed to forward NATS config to worker: %v", err)
+		} else {
+			logger.Log.Info("Successfully forwarded NATS config to worker")
+		}
+	}
+}
+
+func (nd *NatsDistributor) Stop() error {
+	logger.Log.Info("Stopping NATS distributor")
+	nd.cancel()
+	
+	if nd.subscription != nil {
+		if err := nd.subscription.Unsubscribe(); err != nil {
+			logger.Log.Warnf("Failed to unsubscribe from NATS: %v", err)
+		}
+	}
+	
+	if nd.natsClient != nil {
+		nd.natsClient.Close()
+	}
+	return nil
+}
+
+func (nd *NatsDistributor) GetType() DistributionStrategy {
+	return StrategyNats
+}
+
+func (nd *NatsDistributor) GetLastConfig() *models.WorkerConfig {
+	nd.mu.RLock()
+	defer nd.mu.RUnlock()
+	return nd.lastConfig
+}
+
+func (nd *NatsDistributor) GetLastVersion() string {
+	nd.mu.RLock()
+	defer nd.mu.RUnlock()
+	return nd.lastVersion
+}
+
 // DistributionManager manages the selected distribution strategy
 type DistributionManager struct {
 	strategy    DistributionStrategy
@@ -172,6 +298,7 @@ func NewDistributionManager(
 	workerMgr *worker.Manager,
 	cacheFile string,
 	redisConfig redis.Config,
+	natsConfig natspkg.Config,
 ) (*DistributionManager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -186,6 +313,12 @@ func NewDistributionManager(
 		if err != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to create Redis distributor: %w", err)
+		}
+	case StrategyNats:
+		distributor, err = NewNatsDistributor(natsConfig, workerMgr)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to create NATS distributor: %w", err)
 		}
 	default:
 		cancel()

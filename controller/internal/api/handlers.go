@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/doniyusdinar/config-management/pkg/logger"
 	"github.com/doniyusdinar/config-management/pkg/models"
 	"github.com/doniyusdinar/config-management/pkg/redis"
+	natspkg "github.com/doniyusdinar/config-management/pkg/nats"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -17,6 +19,7 @@ import (
 type Handler struct {
 	db            *database.DB
 	redisClient   *redis.Client
+	natsClient    *natspkg.Client
 	agentUsername string
 	agentPassword string
 	adminUsername string
@@ -24,10 +27,11 @@ type Handler struct {
 	pollInterval  int
 }
 
-func NewHandler(db *database.DB, redisClient *redis.Client) *Handler {
+func NewHandler(db *database.DB, redisClient *redis.Client, natsClient *natspkg.Client) *Handler {
 	return &Handler{
 		db:            db,
 		redisClient:   redisClient,
+		natsClient:    natsClient,
 		agentUsername: getEnv("AGENT_USERNAME", "agent"),
 		agentPassword: getEnv("AGENT_PASSWORD", "secret123"),
 		adminUsername: getEnv("ADMIN_USERNAME", "admin"),
@@ -190,6 +194,31 @@ func (h *Handler) UpdateConfig(c *gin.Context) {
 			// Store backup in Redis
 			h.redisClient.StoreConfigInRedis(config, versionStr)
 			logger.Log.Info("Configuration published to Redis successfully")
+		}
+	}
+
+	// Publish to NATS if available (non-blocking)
+	if h.natsClient != nil && h.natsClient.IsConnected() {
+		versionStr := strconv.Itoa(int(version))
+		configMessage := struct {
+			Version string              `json:"version"`
+			Config  models.WorkerConfig `json:"config"`
+		}{
+			Version: versionStr,
+			Config:  config,
+		}
+
+		messageData, err := json.Marshal(configMessage)
+		if err != nil {
+			logger.Log.Warnf("Failed to marshal config for NATS: %v", err)
+		} else {
+			subject := "config.worker.update" // Default subject
+
+			if err := h.natsClient.Publish(subject, messageData); err != nil {
+				logger.Log.Warnf("Failed to publish config to NATS (continuing with polling): %v", err)
+			} else {
+				logger.Log.Infof("Configuration published to NATS successfully on subject: %s", subject)
+			}
 		}
 	}
 

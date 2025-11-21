@@ -10,18 +10,20 @@ Successfully refactored the configuration management system from a hybrid approa
 - **Implementations**:
   - `PollerDistributor`: HTTP polling strategy 
   - `RedisDistributor`: Redis pub/sub strategy
+  - `NatsDistributor`: NATS pub/sub strategy
 - **Manager**: `DistributionManager` for strategy selection and lifecycle management
 
 ### 2. Configuration Updates
-- **Environment Variable**: Changed from `REDIS_ENABLED=true/false` to `DISTRIBUTION_STRATEGY=POLLER|REDIS`
+- **Environment Variable**: Changed from `REDIS_ENABLED=true/false` to `DISTRIBUTION_STRATEGY=POLLER|REDIS|NATS`
 - **Agent Config**: Updated `agent/internal/config/config.go` to use `DistributionStrategy string`
-- **Controller Config**: Updated to conditionally initialize Redis only when strategy is REDIS
+- **Controller Config**: Updated to conditionally initialize Redis/NATS based on strategy
 
 ### 3. File Changes
 - **Renamed**: `hybrid.go` → `distribution.go` to reflect the strategy pattern
 - **Updated**: All configuration files and Docker Compose files
 - **Updated**: Makefile targets to use DISTRIBUTION_STRATEGY
 - **Updated**: Test scripts to use strategy pattern terminology
+- **Added**: NATS client package and distributor implementation
 
 ## Available Strategies
 
@@ -35,9 +37,15 @@ Successfully refactored the configuration management system from a hybrid approa
 - Requires Redis server to be available
 - Provides real-time configuration distribution
 
+### NATS Strategy
+- Uses NATS pub/sub for instant configuration propagation
+- Requires NATS server to be available  
+- Provides real-time configuration distribution with horizontal scalability
+- Supports load balancing via queue groups
+- Ideal for 1000+ agent deployments
+
 ### Future Extensibility
 The interface-based design allows easy addition of new strategies:
-- NATS
 - Kafka  
 - RabbitMQ
 - WebSockets
@@ -55,6 +63,12 @@ DISTRIBUTION_STRATEGY=REDIS
 REDIS_ADDRESS=localhost:6379
 REDIS_PASSWORD=
 REDIS_DB=0
+
+# NATS Pub/Sub Strategy
+DISTRIBUTION_STRATEGY=NATS
+NATS_URL=nats://localhost:4222
+NATS_SUBJECT=config.worker.update
+NATS_QUEUE_GROUP=config-workers
 ```
 
 ### Docker Compose
@@ -96,11 +110,26 @@ make run-agent-poller
 ./scripts/test-local-redis.sh
 ```
 
+### Local NATS Testing 🆕
+```bash
+./scripts/test-local-nats.sh
+```
+
+### Docker NATS Testing 🆕
+```bash
+./scripts/test-strategy-nats.sh
+```
+
 ## Production Deployment
 
 ### Redis Strategy (Recommended for real-time updates)
 ```bash
 DISTRIBUTION_STRATEGY=REDIS docker-compose -f docker-compose.production.yml up -d
+```
+
+### NATS Strategy (Recommended for large-scale) 🆕
+```bash
+DISTRIBUTION_STRATEGY=NATS docker-compose -f docker-compose.agents-nats.yml up -d
 ```
 
 ### HTTP Polling Strategy (Fallback/Simple deployments)
@@ -114,7 +143,9 @@ DISTRIBUTION_STRATEGY=POLLER docker-compose -f docker-compose.production.yml up 
 2. **Extensibility**: Easy to add new distribution methods (NATS, Kafka)
 3. **Backward Compatibility**: POLLER strategy maintains existing behavior
 4. **Performance**: Redis strategy provides instant configuration propagation
-5. **Flexibility**: Environment-based strategy selection
+5. **Scalability**: NATS strategy optimized for large-scale deployments 🆕
+6. **Load Balancing**: NATS queue groups enable horizontal scaling 🆕
+7. **Flexibility**: Environment-based strategy selection
 6. **Testability**: Each strategy can be tested independently
 
 ## Files Modified

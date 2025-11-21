@@ -20,6 +20,14 @@ type Config struct {
 	RedisAddress          string
 	RedisPassword         string
 	RedisDB               int
+	// NATS configuration
+	NatsURL               string
+	NatsUsername          string
+	NatsPassword          string
+	NatsToken             string
+	NatsTLSEnabled        bool
+	NatsSubject           string
+	NatsQueueGroup        string
 }
 
 func LoadConfig() (*Config, error) {
@@ -39,6 +47,13 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("REDIS_ADDRESS", "localhost:6379")
 	viper.SetDefault("REDIS_PASSWORD", "")
 	viper.SetDefault("REDIS_DB", "0")
+	viper.SetDefault("NATS_URL", "nats://localhost:4222")
+	viper.SetDefault("NATS_USERNAME", "")
+	viper.SetDefault("NATS_PASSWORD", "")
+	viper.SetDefault("NATS_TOKEN", "")
+	viper.SetDefault("NATS_TLS_ENABLED", "false")
+	viper.SetDefault("NATS_SUBJECT", "config.worker.update")
+	viper.SetDefault("NATS_QUEUE_GROUP", "config-workers")
 
 	// Try to read config file (optional)
 	if err := viper.ReadInConfig(); err != nil {
@@ -59,6 +74,13 @@ func LoadConfig() (*Config, error) {
 		RedisAddress:          getEnv("REDIS_ADDRESS", viper.GetString("REDIS_ADDRESS")),
 		RedisPassword:         getEnv("REDIS_PASSWORD", viper.GetString("REDIS_PASSWORD")),
 		RedisDB:               getEnvInt("REDIS_DB", viper.GetInt("REDIS_DB")),
+		NatsURL:               getEnv("NATS_URL", viper.GetString("NATS_URL")),
+		NatsUsername:          getEnv("NATS_USERNAME", viper.GetString("NATS_USERNAME")),
+		NatsPassword:          getEnv("NATS_PASSWORD", viper.GetString("NATS_PASSWORD")),
+		NatsToken:             getEnv("NATS_TOKEN", viper.GetString("NATS_TOKEN")),
+		NatsTLSEnabled:        getEnvBool("NATS_TLS_ENABLED", viper.GetBool("NATS_TLS_ENABLED")),
+		NatsSubject:           getEnv("NATS_SUBJECT", viper.GetString("NATS_SUBJECT")),
+		NatsQueueGroup:        getEnv("NATS_QUEUE_GROUP", viper.GetString("NATS_QUEUE_GROUP")),
 	}
 
 	return config, nil
@@ -75,6 +97,15 @@ func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intVal, err := strconv.Atoi(value); err == nil {
 			return intVal
+		}
+	}
+	return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolVal, err := strconv.ParseBool(value); err == nil {
+			return boolVal
 		}
 	}
 	return defaultValue

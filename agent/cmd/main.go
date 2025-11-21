@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/doniyusdinar/config-management/agent/internal/config"
 	"github.com/doniyusdinar/config-management/agent/internal/poller"
@@ -16,6 +18,7 @@ import (
 	"github.com/doniyusdinar/config-management/pkg/logger"
 	"github.com/doniyusdinar/config-management/pkg/models"
 	"github.com/doniyusdinar/config-management/pkg/redis"
+	"github.com/doniyusdinar/config-management/pkg/nats"
 )
 
 func main() {
@@ -45,6 +48,21 @@ func main() {
 		Enabled:  true, // Always enabled for Redis strategy
 	}
 
+	// Create NATS config for strategy
+	natsConfig := nats.Config{
+		URLs:            strings.Split(cfg.NatsURL, ","),
+		Username:        cfg.NatsUsername,
+		Password:        cfg.NatsPassword,
+		Token:           cfg.NatsToken,
+		TLSEnabled:      cfg.NatsTLSEnabled,
+		MaxReconnect:    10,
+		ReconnectWait:   2 * time.Second,
+		ConnectionName:  fmt.Sprintf("config-agent-%s", getHostname()),
+		Subject:         cfg.NatsSubject,
+		QueueGroup:      cfg.NatsQueueGroup,
+		Enabled:         true, // Always enabled for NATS strategy
+	}
+
 	// Determine distribution strategy
 	strategy := poller.DistributionStrategy(cfg.DistributionStrategy)
 	
@@ -57,6 +75,7 @@ func main() {
 		workerMgr,
 		cfg.CacheFile,
 		redisConfig,
+		natsConfig,
 	)
 	if err != nil {
 		logger.Log.Fatalf("Failed to create distribution manager: %v", err)

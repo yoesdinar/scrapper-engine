@@ -33,7 +33,7 @@ A distributed configuration management system implemented in Go, featuring a Con
 ## Features
 
 - ✅ **Centralized Configuration Management** - Single source of truth for all agents
-- ✅ **Strategy Pattern Architecture** - Choose between HTTP polling or Redis pub/sub distribution
+- ✅ **Strategy Pattern Architecture** - Choose between HTTP polling, Redis pub/sub, or NATS pub/sub distribution
 - ✅ **Version-based Change Detection** - ETag headers for efficient polling
 - ✅ **Exponential Backoff** - Resilient agent polling with automatic retry
 - ✅ **Configuration Persistence** - SQLite database with history tracking
@@ -43,7 +43,9 @@ A distributed configuration management system implemented in Go, featuring a Con
 - ✅ **Swagger Documentation** - Auto-generated API docs
 - ✅ **Graceful Shutdown** - Proper cleanup on SIGTERM/SIGINT
 - ✅ **Structured Logging** - Comprehensive logging with logrus
-- ✅ **Extensible Design** - Easy to add new distribution strategies (NATS, Kafka, etc.)
+- ✅ **NATS Integration** - High-performance messaging for large-scale deployments 🆕
+- ✅ **Load Balancing** - NATS queue groups for horizontal scaling 🆕
+- ✅ **Extensible Design** - Easy to add new distribution strategies (Kafka, WebSockets, etc.)
 
 ## Project Structure
 
@@ -387,6 +389,9 @@ DISTRIBUTION_STRATEGY=POLLER docker-compose -f docker-compose.production.yml up 
 
 # Redis strategy (instant updates)
 DISTRIBUTION_STRATEGY=REDIS docker-compose -f docker-compose.production.yml up -d
+
+# NATS strategy (large-scale, load-balanced) 🆕
+DISTRIBUTION_STRATEGY=NATS docker-compose -f docker-compose.agents-nats.yml up -d
 ```
 
 ### Test Strategy Pattern Architecture

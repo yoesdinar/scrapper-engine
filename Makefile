@@ -67,12 +67,39 @@ run-controller-redis: ## Run controller service with Redis distribution strategy
 	ADMIN_PASSWORD=admin123 \
 	go run ./cmd
 
+run-controller-nats: ## Run controller service with NATS distribution strategy
+	cd controller && \
+	DISTRIBUTION_STRATEGY=NATS \
+	NATS_URL=nats://localhost:4222 \
+	NATS_SUBJECT=config.worker.update \
+	NATS_QUEUE_GROUP=config-workers \
+	DB_PATH=./controller.db \
+	PORT=8080 \
+	AGENT_USERNAME=agent \
+	AGENT_PASSWORD=secret123 \
+	ADMIN_USERNAME=admin \
+	ADMIN_PASSWORD=admin123 \
+	go run ./cmd
+
 run-agent-redis: ## Run agent service with Redis distribution strategy
 	cd agent && \
 	DISTRIBUTION_STRATEGY=REDIS \
 	REDIS_ADDRESS=localhost:6379 \
 	REDIS_PASSWORD= \
 	REDIS_DB=0 \
+	CONTROLLER_URL=http://localhost:8080 \
+	CONTROLLER_USERNAME=agent \
+	CONTROLLER_PASSWORD=secret123 \
+	WORKER_URL=http://localhost:8082 \
+	CACHE_FILE=./agent_config.cache \
+	go run ./cmd
+
+run-agent-nats: ## Run agent service with NATS distribution strategy
+	cd agent && \
+	DISTRIBUTION_STRATEGY=NATS \
+	NATS_URL=nats://localhost:4222 \
+	NATS_SUBJECT=config.worker.update \
+	NATS_QUEUE_GROUP=config-workers \
 	CONTROLLER_URL=http://localhost:8080 \
 	CONTROLLER_USERNAME=agent \
 	CONTROLLER_PASSWORD=secret123 \
@@ -109,11 +136,36 @@ stop-redis: ## Stop Redis server
 	@echo "Stopping Redis server..."
 	@redis-cli shutdown || echo "Redis was not running"
 
+start-nats: ## Start NATS server locally (requires NATS installation)
+	@echo "Starting NATS server..."
+	@if command -v nats-server >/dev/null 2>&1; then \
+		nats-server --port 4222 --http_port 8222 --jetstream --store_dir ./nats-data & \
+		echo "✅ NATS started on localhost:4222 (HTTP monitoring on :8222)"; \
+	else \
+		echo "❌ NATS not installed. Install with: brew install nats-server (macOS) or download from https://nats.io/download"; \
+		exit 1; \
+	fi
+
+stop-nats: ## Stop NATS server
+	@echo "Stopping NATS server..."
+	@pkill nats-server || echo "NATS was not running"
+
 test-redis-local: ## Test Redis strategy with local services (automated)
 	./scripts/test-local-redis.sh
 
 setup-redis-local: ## Setup Redis server for local testing
 	./scripts/setup-local-redis.sh
+
+test-nats-local: ## Test NATS strategy with local services (automated)
+	./scripts/test-local-nats.sh
+
+test-nats-docker: ## Test NATS strategy with Docker services
+	./scripts/test-strategy-nats.sh
+
+setup-nats-local: ## Setup NATS server for local testing
+	@echo "Setting up NATS for local testing..."
+	@make start-nats
+	@echo "NATS server ready for testing"
 
 docker-build: ## Build Docker images
 	docker-compose -f docker/docker-compose.controller.yml build
