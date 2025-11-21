@@ -1,0 +1,42 @@
+services:
+  controller:
+    image: local/controller:latest
+    build:
+      context: .
+      dockerfile: controller/Dockerfile
+
+  agent1:
+    image: local/agent:latest
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+      
+  agent2:
+    image: local/agent:latest
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+      
+  agent3:
+    image: local/agent:latest
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+
+  worker1:
+    image: local/worker:latest
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+      
+  worker2:
+    image: local/worker:latest
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+      
+  worker3:
+    image: local/worker:latest
+    build:
+      context: .
+      dockerfile: worker/Dockerfile

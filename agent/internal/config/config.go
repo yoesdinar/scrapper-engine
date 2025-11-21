@@ -3,17 +3,31 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	ControllerURL      string
-	ControllerUsername string
-	ControllerPassword string
-	WorkerURL          string
-	LogLevel           string
-	CacheFile          string
+	ControllerURL         string
+	ControllerUsername    string
+	ControllerPassword    string
+	WorkerURL             string
+	LogLevel              string
+	CacheFile             string
+	// Distribution strategy configuration
+	DistributionStrategy  string // POLLER, REDIS, NATS, KAFKA (future)
+	RedisAddress          string
+	RedisPassword         string
+	RedisDB               int
+	// NATS configuration
+	NatsURL               string
+	NatsUsername          string
+	NatsPassword          string
+	NatsToken             string
+	NatsTLSEnabled        bool
+	NatsSubject           string
+	NatsQueueGroup        string
 }
 
 func LoadConfig() (*Config, error) {
@@ -29,6 +43,17 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("WORKER_URL", "http://localhost:8082")
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("CACHE_FILE", "./agent_config.cache")
+	viper.SetDefault("DISTRIBUTION_STRATEGY", "POLLER")
+	viper.SetDefault("REDIS_ADDRESS", "localhost:6379")
+	viper.SetDefault("REDIS_PASSWORD", "")
+	viper.SetDefault("REDIS_DB", "0")
+	viper.SetDefault("NATS_URL", "nats://localhost:4222")
+	viper.SetDefault("NATS_USERNAME", "")
+	viper.SetDefault("NATS_PASSWORD", "")
+	viper.SetDefault("NATS_TOKEN", "")
+	viper.SetDefault("NATS_TLS_ENABLED", "false")
+	viper.SetDefault("NATS_SUBJECT", "config.worker.update")
+	viper.SetDefault("NATS_QUEUE_GROUP", "config-workers")
 
 	// Try to read config file (optional)
 	if err := viper.ReadInConfig(); err != nil {
@@ -39,12 +64,23 @@ func LoadConfig() (*Config, error) {
 	}
 
 	config := &Config{
-		ControllerURL:      getEnv("CONTROLLER_URL", viper.GetString("CONTROLLER_URL")),
-		ControllerUsername: getEnv("CONTROLLER_USERNAME", viper.GetString("CONTROLLER_USERNAME")),
-		ControllerPassword: getEnv("CONTROLLER_PASSWORD", viper.GetString("CONTROLLER_PASSWORD")),
-		WorkerURL:          getEnv("WORKER_URL", viper.GetString("WORKER_URL")),
-		LogLevel:           getEnv("LOG_LEVEL", viper.GetString("LOG_LEVEL")),
-		CacheFile:          getEnv("CACHE_FILE", viper.GetString("CACHE_FILE")),
+		ControllerURL:         getEnv("CONTROLLER_URL", viper.GetString("CONTROLLER_URL")),
+		ControllerUsername:    getEnv("CONTROLLER_USERNAME", viper.GetString("CONTROLLER_USERNAME")),
+		ControllerPassword:    getEnv("CONTROLLER_PASSWORD", viper.GetString("CONTROLLER_PASSWORD")),
+		WorkerURL:             getEnv("WORKER_URL", viper.GetString("WORKER_URL")),
+		LogLevel:              getEnv("LOG_LEVEL", viper.GetString("LOG_LEVEL")),
+		CacheFile:             getEnv("CACHE_FILE", viper.GetString("CACHE_FILE")),
+		DistributionStrategy:  getEnv("DISTRIBUTION_STRATEGY", viper.GetString("DISTRIBUTION_STRATEGY")),
+		RedisAddress:          getEnv("REDIS_ADDRESS", viper.GetString("REDIS_ADDRESS")),
+		RedisPassword:         getEnv("REDIS_PASSWORD", viper.GetString("REDIS_PASSWORD")),
+		RedisDB:               getEnvInt("REDIS_DB", viper.GetInt("REDIS_DB")),
+		NatsURL:               getEnv("NATS_URL", viper.GetString("NATS_URL")),
+		NatsUsername:          getEnv("NATS_USERNAME", viper.GetString("NATS_USERNAME")),
+		NatsPassword:          getEnv("NATS_PASSWORD", viper.GetString("NATS_PASSWORD")),
+		NatsToken:             getEnv("NATS_TOKEN", viper.GetString("NATS_TOKEN")),
+		NatsTLSEnabled:        getEnvBool("NATS_TLS_ENABLED", viper.GetBool("NATS_TLS_ENABLED")),
+		NatsSubject:           getEnv("NATS_SUBJECT", viper.GetString("NATS_SUBJECT")),
+		NatsQueueGroup:        getEnv("NATS_QUEUE_GROUP", viper.GetString("NATS_QUEUE_GROUP")),
 	}
 
 	return config, nil
@@ -53,6 +89,24 @@ func LoadConfig() (*Config, error) {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intVal, err := strconv.Atoi(value); err == nil {
+			return intVal
+		}
+	}
+	return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolVal, err := strconv.ParseBool(value); err == nil {
+			return boolVal
+		}
 	}
 	return defaultValue
 }

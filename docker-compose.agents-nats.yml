@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    container_name: nats-server
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+      - "6222:6222"   # Cluster connections
+    command:
+      - --server_name=nats-dev
+      - --jetstream
+      - --store_dir=/data
+      - --http_port=8222
+    volumes:
+      - nats_data:/data
+    networks:
+      - config_management
+
+  # Controller service
+  controller:
+    build:
+      context: .
+      dockerfile: controller/Dockerfile
+    container_name: controller
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - LOG_LEVEL=info
+      - DB_PATH=/app/data/controller.db
+      - DISTRIBUTION_STRATEGY=NATS
+      - NATS_URL=nats://nats:4222
+      - NATS_SUBJECT=config.worker.update
+      - NATS_QUEUE_GROUP=config-workers
+    volumes:
+      - controller_data:/app/data
+    networks:
+      - config_management
+    depends_on:
+      - nats
+
+  # Agent service with NATS strategy
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: agent-nats
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=secret123
+      - WORKER_URL=http://worker:8082
+      - LOG_LEVEL=info
+      - CACHE_FILE=/app/data/agent_config.cache
+      - DISTRIBUTION_STRATEGY=NATS
+      - NATS_URL=nats://nats:4222
+      - NATS_SUBJECT=config.worker.update
+      - NATS_QUEUE_GROUP=config-workers
+    volumes:
+      - agent_data:/app/data
+    networks:
+      - config_management
+    depends_on:
+      - controller
+      - nats
+      - worker
+
+  # Worker service
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: worker
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - LOG_LEVEL=info
+    networks:
+      - config_management
+
+networks:
+  config_management:
+    driver: bridge
+
+volumes:
+  nats_data:
+  controller_data:
+  agent_data:

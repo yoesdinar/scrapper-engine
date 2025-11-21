@@ -81,9 +81,9 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p deploy
-          cp docker-compose.production.yml deploy/
+          cp docker-compose.external-lb.yml deploy/docker-compose.yml
           
-          # Copy nginx config if exists
+          # Copy nginx config
           if [ -d "nginx" ]; then
             cp -r nginx deploy/
           fi
@@ -93,11 +93,28 @@ jobs:
             cp -r scripts deploy/
           fi
           
-          # Create .env file with image version
+          # Create .env file with image version and production settings
           cat > deploy/.env << EOF
           IMAGE_TAG=${{ steps.version.outputs.VERSION }}
           REGISTRY=${{ env.REGISTRY }}
           IMAGE_PREFIX=${{ env.IMAGE_PREFIX }}
+          
+          # Production NATS Configuration
+          NATS_URL=nats://nats:4222
+          NATS_SUBJECT=config.worker.update
+          NATS_QUEUE_GROUP=config-workers
+          
+          # Production Authentication
+          AGENT_USERNAME=agent
+          AGENT_PASSWORD=\${AGENT_PASSWORD:-prod-secret-123}
+          ADMIN_USERNAME=admin
+          ADMIN_PASSWORD=\${ADMIN_PASSWORD:-admin-prod-456}
+          
+          # Distribution Strategy
+          DISTRIBUTION_STRATEGY=NATS
+          
+          # Logging
+          LOG_LEVEL=info
           EOF
 
       - name: Deploy to production server
@@ -119,18 +136,83 @@ jobs:
           script: |
             cd /root/config-management
             
-            # Pull new images (public images, no authentication needed)
+            # Pull new images
             export IMAGE_TAG=${{ steps.version.outputs.VERSION }}
             export REGISTRY=${{ env.REGISTRY }}
             export IMAGE_PREFIX=${{ env.IMAGE_PREFIX }}
             
-            docker compose -f docker-compose.production.yml pull
+            echo "🚀 Deploying Config Management v$IMAGE_TAG with External Load Balancer"
             
-            # Restart services with new images
-            docker compose -f docker-compose.production.yml up -d
+            # Stop existing services gracefully
+            docker compose down --remove-orphans
+            
+            # Remove old images
+            echo "🗑️ Cleaning old images..."
+            docker images | grep config-management | awk '{print $3}' | xargs -r docker rmi -f || true
+            
+            # Pull latest images from GHCR
+            echo "📥 Pulling images from GitHub Container Registry..."
+            docker compose pull
+            
+            # Start services in order: NATS -> Controller -> Workers -> Load Balancer -> Agents
+            echo "📡 Starting NATS server..."
+            docker compose up -d nats
+            sleep 10
+            
+            echo "🎛️ Starting controller..."
+            docker compose up -d controller
+            sleep 15
+            
+            echo "👷 Starting workers..."
+            docker compose up -d worker1 worker2 worker3
+            sleep 10
+            
+            echo "⚖️ Starting external load balancer..."
+            docker compose up -d external-lb
+            sleep 5
+            
+            echo "🤖 Starting agents..."
+            docker compose up -d agent1 agent2 agent3
+            sleep 10
+            
+            # Health checks
+            echo "🔍 Running health checks..."
+            
+            # Check controller
+            if curl -f http://localhost:8080/health >/dev/null 2>&1; then
+              echo "✅ Controller: Healthy"
+            else
+              echo "❌ Controller: Failed"
+            fi
+            
+            # Check external load balancer
+            if curl -f http://localhost:80/health >/dev/null 2>&1; then
+              echo "✅ External Load Balancer: Healthy"
+            else
+              echo "❌ External Load Balancer: Failed"
+            fi
+            
+            # Check individual workers
+            for port in 8082 8083 8084; do
+              if curl -f http://localhost:$port/health >/dev/null 2>&1; then
+                echo "✅ Worker (port $port): Healthy"
+              else
+                echo "❌ Worker (port $port): Failed"
+              fi
+            done
             
             # Clean up old images
             docker image prune -f
             
-            echo "Deployment completed successfully!"
-            docker compose -f docker-compose.production.yml ps
+            echo "🎉 Production Deployment Complete!"
+            echo ""
+            echo "📊 Service Status:"
+            docker compose ps
+            echo ""
+            echo "🔗 Production Endpoints:"
+            echo "  - Controller API: http://$(hostname):8080"
+            echo "  - External Load Balancer: http://$(hostname):80/worker/*"
+            echo "  - Worker1 Direct: http://$(hostname):8082"
+            echo "  - Worker2 Direct: http://$(hostname):8083"
+            echo "  - Worker3 Direct: http://$(hostname):8084"
+            echo "  - NATS Monitoring: http://$(hostname):4222"

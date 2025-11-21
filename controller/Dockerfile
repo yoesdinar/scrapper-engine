@@ -1,5 +1,8 @@
 # Build stage
-FROM golang:1.21-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.21-bookworm AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -16,7 +19,7 @@ RUN go mod download
 
 COPY controller/ .
 
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o controller ./cmd
+RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -installsuffix cgo -o controller ./cmd
 
 # Runtime stage
 FROM debian:bookworm-slim

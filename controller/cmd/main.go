@@ -6,12 +6,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/doniyusdinar/config-management/controller/internal/api"
 	"github.com/doniyusdinar/config-management/controller/internal/database"
 	"github.com/doniyusdinar/config-management/pkg/logger"
+	"github.com/doniyusdinar/config-management/pkg/redis"
+	natspkg "github.com/doniyusdinar/config-management/pkg/nats"
 
 	_ "github.com/doniyusdinar/config-management/controller/docs"
 )
@@ -49,7 +53,56 @@ func main() {
 
 	logger.Log.Info("Database initialized successfully")
 
-	handler := api.NewHandler(db)
+	// Initialize Redis client (optional based on distribution strategy)
+	var redisClient *redis.Client
+	var natsClient *natspkg.Client
+	distributionStrategy := getEnv("DISTRIBUTION_STRATEGY", "POLLER")
+	
+	if distributionStrategy == "REDIS" {
+		redisConfig := redis.Config{
+			Address:  getEnv("REDIS_ADDRESS", "localhost:6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			DB:       getEnvInt("REDIS_DB", 0),
+			Enabled:  true,
+		}
+
+		redisClient, err = redis.NewClient(redisConfig)
+		if err != nil {
+			logger.Log.Warnf("Failed to connect to Redis, Redis distribution disabled: %v", err)
+			redisClient = nil
+		} else {
+			defer redisClient.Close()
+			logger.Log.Info("Redis client initialized successfully for distribution")
+		}
+	} else if distributionStrategy == "NATS" {
+		natsConfig := natspkg.Config{
+			URLs:            strings.Split(getEnv("NATS_URL", "nats://localhost:4222"), ","),
+			Username:        getEnv("NATS_USERNAME", ""),
+			Password:        getEnv("NATS_PASSWORD", ""),
+			Token:           getEnv("NATS_TOKEN", ""),
+			TLSEnabled:      getEnvBool("NATS_TLS_ENABLED", false),
+			MaxReconnect:    10,
+			ReconnectWait:   2 * time.Second,
+			ConnectionName:  "controller-publisher",
+			Subject:         getEnv("NATS_SUBJECT", "config.worker.update"),
+			QueueGroup:      getEnv("NATS_QUEUE_GROUP", "config-workers"),
+			Enabled:         true,
+		}
+
+		natsClient = natspkg.NewClient(natsConfig)
+		err = natsClient.Connect()
+		if err != nil {
+			logger.Log.Warnf("Failed to connect to NATS, NATS distribution disabled: %v", err)
+			natsClient = nil
+		} else {
+			defer natsClient.Close()
+			logger.Log.Info("NATS client initialized successfully for distribution")
+		}
+	} else {
+		logger.Log.Infof("Distribution strategy: %s (Redis/NATS not needed)", distributionStrategy)
+	}
+
+	handler := api.NewHandler(db, redisClient, natsClient)
 	router := api.SetupRouter(handler)
 
 	srv := &http.Server{
@@ -84,6 +137,24 @@ func main() {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intVal, err := strconv.Atoi(value); err == nil {
+			return intVal
+		}
+	}
+	return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolVal, err := strconv.ParseBool(value); err == nil {
+			return boolVal
+		}
 	}
 	return defaultValue
 }
