@@ -33,6 +33,7 @@ A distributed configuration management system implemented in Go, featuring a Con
 ## Features
 
 - ✅ **Centralized Configuration Management** - Single source of truth for all agents
+- ✅ **Strategy Pattern Architecture** - Choose between HTTP polling or Redis pub/sub distribution
 - ✅ **Version-based Change Detection** - ETag headers for efficient polling
 - ✅ **Exponential Backoff** - Resilient agent polling with automatic retry
 - ✅ **Configuration Persistence** - SQLite database with history tracking
@@ -42,6 +43,7 @@ A distributed configuration management system implemented in Go, featuring a Con
 - ✅ **Swagger Documentation** - Auto-generated API docs
 - ✅ **Graceful Shutdown** - Proper cleanup on SIGTERM/SIGINT
 - ✅ **Structured Logging** - Comprehensive logging with logrus
+- ✅ **Extensible Design** - Easy to add new distribution strategies (NATS, Kafka, etc.)
 
 ## Project Structure
 
@@ -75,7 +77,8 @@ coding-test/
 ├── pkg/                # Shared code
 │   ├── models/         # Common data structures
 │   ├── auth/           # Authentication utilities
-│   └── logger/         # Logging utilities
+│   ├── logger/         # Logging utilities
+│   └── redis/          # Redis pub/sub client
 ├── docker/             # Docker configurations
 ├── docs/               # Documentation
 └── scripts/            # Utility scripts
@@ -365,8 +368,32 @@ make docker-build
 
 ### Start Services with Docker Compose
 
+#### Option 1: Traditional HTTP Polling (Original)
 ```bash
 make docker-up
+```
+
+#### Option 2: Redis Strategy (Recommended)
+```bash
+# Start with Redis strategy for instant updates
+docker-compose -f docker-compose.controller-redis.yml up -d
+docker-compose -f docker-compose.agents-redis.yml up -d
+```
+
+#### Option 3: Production with Strategy Selection
+```bash
+# HTTP Polling strategy
+DISTRIBUTION_STRATEGY=POLLER docker-compose -f docker-compose.production.yml up -d
+
+# Redis strategy (instant updates)
+DISTRIBUTION_STRATEGY=REDIS docker-compose -f docker-compose.production.yml up -d
+```
+
+### Test Strategy Pattern Architecture
+
+```bash
+# Run comprehensive strategy pattern tests
+./scripts/test-strategy-pattern.sh
 ```
 
 ### View Logs
@@ -380,6 +407,23 @@ make docker-logs
 ```bash
 make docker-down
 ```
+
+## Strategy Pattern Architecture
+
+The system now supports **flexible distribution strategies** allowing you to choose the best method for your deployment.
+
+**Available Strategies:**
+- 🔄 **POLLER**: HTTP polling (traditional, reliable)
+- ⚡ **REDIS**: Redis pub/sub (instant updates)
+- 🔮 **Future**: NATS, Kafka, WebSockets (easily extensible)
+
+**Key Benefits:**
+- ⚡ **Instant updates** via Redis strategy (< 1 second vs 30+ seconds)
+- 🔄 **Clean separation** - choose one strategy per deployment
+- 📈 **Extensible design** - easy to add new distribution methods
+- ⚙️ **Environment-based** - simple `DISTRIBUTION_STRATEGY` configuration
+
+**For detailed information:** [Strategy Pattern Guide](STRATEGY-PATTERN-SUMMARY.md)
 
 ## Development
 

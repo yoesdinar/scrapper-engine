@@ -1,0 +1,157 @@
+services:
+  worker1:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    container_name: config-worker1
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - WORKER_ID=worker1
+      - WORKER_NAME=Worker 1
+    networks:
+      - config-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  worker2:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    container_name: config-worker2
+    ports:
+      - "8083:8082"
+    environment:
+      - PORT=8082
+      - WORKER_ID=worker2
+      - WORKER_NAME=Worker 2
+    networks:
+      - config-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  worker3:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    container_name: config-worker3
+    ports:
+      - "8084:8082"
+    environment:
+      - PORT=8082
+      - WORKER_ID=worker3
+      - WORKER_NAME=Worker 3
+    networks:
+      - config-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  agent1:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    container_name: config-agent1
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - AGENT_ID=agent1
+      - AGENT_NAME=Agent 1
+      - WORKER_URL=http://worker1:8082
+      - POLL_INTERVAL=30
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=secret123
+      # Redis distribution strategy
+      - DISTRIBUTION_STRATEGY=REDIS
+      - REDIS_ADDRESS=redis:6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
+    networks:
+      - config-network
+    restart: unless-stopped
+    depends_on:
+      worker1:
+        condition: service_healthy
+
+  agent2:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    container_name: config-agent2
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - AGENT_ID=agent2
+      - AGENT_NAME=Agent 2
+      - WORKER_URL=http://worker2:8082
+      - POLL_INTERVAL=30
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=secret123
+      # Redis distribution strategy
+      - DISTRIBUTION_STRATEGY=REDIS
+      - REDIS_ADDRESS=redis:6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
+    networks:
+      - config-network
+    restart: unless-stopped
+    depends_on:
+      worker2:
+        condition: service_healthy
+
+  agent3:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    container_name: config-agent3
+    environment:
+      - CONTROLLER_URL=http://controller:8080
+      - AGENT_ID=agent3
+      - AGENT_NAME=Agent 3
+      - WORKER_URL=http://worker3:8082
+      - POLL_INTERVAL=30
+      - CONTROLLER_USERNAME=agent
+      - CONTROLLER_PASSWORD=secret123
+      # HTTP polling strategy for backward compatibility test
+      - DISTRIBUTION_STRATEGY=POLLER
+    networks:
+      - config-network
+    restart: unless-stopped
+    depends_on:
+      worker3:
+        condition: service_healthy
+
+networks:
+  config-network:
+    external: true

@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - config-network
+    restart: unless-stopped
+    profiles:
+      - redis  # Optional service, enabled with --profile redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   nginx:
     image: nginx:alpine
     container_name: config-nginx
@@ -41,6 +60,11 @@ services:
       - ADMIN_PASSWORD=admin123
       - AGENT_USERNAME=agent
       - AGENT_PASSWORD=agentpass123
+      # Distribution strategy configuration
+      - DISTRIBUTION_STRATEGY=${DISTRIBUTION_STRATEGY:-POLLER}
+      - REDIS_ADDRESS=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
     volumes:
       - controller-data:/data
     networks:
@@ -65,6 +89,11 @@ services:
       - POLL_INTERVAL=10
       - CONTROLLER_USERNAME=agent
       - CONTROLLER_PASSWORD=agentpass123
+      # Distribution strategy configuration
+      - DISTRIBUTION_STRATEGY=${DISTRIBUTION_STRATEGY:-POLLER}
+      - REDIS_ADDRESS=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
     depends_on:
       controller:
         condition: service_healthy
@@ -86,6 +115,11 @@ services:
       - POLL_INTERVAL=10
       - CONTROLLER_USERNAME=agent
       - CONTROLLER_PASSWORD=agentpass123
+      # Distribution strategy configuration
+      - DISTRIBUTION_STRATEGY=${DISTRIBUTION_STRATEGY:-POLLER}
+      - REDIS_ADDRESS=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
     depends_on:
       controller:
         condition: service_healthy
@@ -102,11 +136,13 @@ services:
     environment:
       - CONTROLLER_URL=http://controller:8080
       - AGENT_ID=agent3
-      - AGENT_NAME=Production Agent 3
+      - AGENT_NAME=Production Agent 3 (Polling Only)
       - WORKER_URL=http://worker3:8082
       - POLL_INTERVAL=10
       - CONTROLLER_USERNAME=agent
       - CONTROLLER_PASSWORD=agentpass123
+      # Distribution strategy (explicitly set to POLLER for demonstration)
+      - DISTRIBUTION_STRATEGY=POLLER
     depends_on:
       controller:
         condition: service_healthy
@@ -183,3 +219,4 @@ networks:
 volumes:
   controller-data:
   nginx-logs:
+  redis-data:

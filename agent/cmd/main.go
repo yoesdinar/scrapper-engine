@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"github.com/doniyusdinar/config-management/pkg/auth"
 	"github.com/doniyusdinar/config-management/pkg/logger"
 	"github.com/doniyusdinar/config-management/pkg/models"
+	"github.com/doniyusdinar/config-management/pkg/redis"
 )
 
 func main() {
@@ -27,9 +27,6 @@ func main() {
 	logger.SetLevel(cfg.LogLevel)
 	logger.Log.Info("Starting Configuration Management Agent")
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	agentID, pollURL, pollInterval, err := registerWithController(cfg)
 	if err != nil {
 		logger.Log.Fatalf("Failed to register with controller: %v", err)
@@ -39,11 +36,35 @@ func main() {
 	logger.Log.Infof("Poll URL: %s, Interval: %d seconds", pollURL, pollInterval)
 
 	workerMgr := worker.NewManager(cfg.WorkerURL)
-	p := poller.NewPoller(cfg.ControllerURL, cfg.ControllerUsername, cfg.ControllerPassword, workerMgr, cfg.CacheFile)
+
+	// Create Redis config for strategy
+	redisConfig := redis.Config{
+		Address:  cfg.RedisAddress,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+		Enabled:  true, // Always enabled for Redis strategy
+	}
+
+	// Determine distribution strategy
+	strategy := poller.DistributionStrategy(cfg.DistributionStrategy)
+	
+	// Create distribution manager with the specified strategy
+	distributionMgr, err := poller.NewDistributionManager(
+		strategy,
+		cfg.ControllerURL,
+		cfg.ControllerUsername,
+		cfg.ControllerPassword,
+		workerMgr,
+		cfg.CacheFile,
+		redisConfig,
+	)
+	if err != nil {
+		logger.Log.Fatalf("Failed to create distribution manager: %v", err)
+	}
 
 	go func() {
-		if err := p.Start(ctx); err != nil {
-			logger.Log.Errorf("Poller error: %v", err)
+		if err := distributionMgr.Start(); err != nil {
+			logger.Log.Errorf("Distribution manager error: %v", err)
 		}
 	}()
 
@@ -52,7 +73,7 @@ func main() {
 	<-quit
 
 	logger.Log.Info("Shutting down agent...")
-	cancel()
+	distributionMgr.Stop()
 	logger.Log.Info("Agent exited")
 }
 

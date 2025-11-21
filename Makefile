@@ -14,6 +14,9 @@ build: ## Build all services
 	@echo "Building worker..."
 	cd worker && go build -o worker ./cmd
 
+build-images: ## Build Docker images for local development
+	./scripts/build-images.sh
+
 test: ## Run tests for all services
 	@echo "Testing pkg..."
 	cd pkg && go test ./...
@@ -50,6 +53,68 @@ run-agent: ## Run agent service
 run-worker: ## Run worker service
 	cd worker && go run ./cmd
 
+run-controller-redis: ## Run controller service with Redis distribution strategy
+	cd controller && \
+	DISTRIBUTION_STRATEGY=REDIS \
+	REDIS_ADDRESS=localhost:6379 \
+	REDIS_PASSWORD= \
+	REDIS_DB=0 \
+	DB_PATH=./controller.db \
+	PORT=8080 \
+	AGENT_USERNAME=agent \
+	AGENT_PASSWORD=secret123 \
+	ADMIN_USERNAME=admin \
+	ADMIN_PASSWORD=admin123 \
+	go run ./cmd
+
+run-agent-redis: ## Run agent service with Redis distribution strategy
+	cd agent && \
+	DISTRIBUTION_STRATEGY=REDIS \
+	REDIS_ADDRESS=localhost:6379 \
+	REDIS_PASSWORD= \
+	REDIS_DB=0 \
+	CONTROLLER_URL=http://localhost:8080 \
+	CONTROLLER_USERNAME=agent \
+	CONTROLLER_PASSWORD=secret123 \
+	WORKER_URL=http://localhost:8082 \
+	CACHE_FILE=./agent_config.cache \
+	go run ./cmd
+
+run-agent-poller: ## Run agent service with HTTP polling distribution strategy
+	cd agent && \
+	DISTRIBUTION_STRATEGY=POLLER \
+	CONTROLLER_URL=http://localhost:8080 \
+	CONTROLLER_USERNAME=agent \
+	CONTROLLER_PASSWORD=secret123 \
+	WORKER_URL=http://localhost:8082 \
+	CACHE_FILE=./agent_config.cache \
+	go run ./cmd
+
+run-worker-redis: ## Run worker service (Redis not needed for worker)
+	cd worker && \
+	PORT=8082 \
+	go run ./cmd
+
+start-redis: ## Start Redis server locally (requires Redis installation)
+	@echo "Starting Redis server..."
+	@if command -v redis-server >/dev/null 2>&1; then \
+		redis-server --daemonize yes --port 6379; \
+		echo "✅ Redis started on localhost:6379"; \
+	else \
+		echo "❌ Redis not installed. Install with: brew install redis (macOS) or apt-get install redis-server (Ubuntu)"; \
+		exit 1; \
+	fi
+
+stop-redis: ## Stop Redis server
+	@echo "Stopping Redis server..."
+	@redis-cli shutdown || echo "Redis was not running"
+
+test-redis-local: ## Test Redis strategy with local services (automated)
+	./scripts/test-local-redis.sh
+
+setup-redis-local: ## Setup Redis server for local testing
+	./scripts/setup-local-redis.sh
+
 docker-build: ## Build Docker images
 	docker-compose -f docker/docker-compose.controller.yml build
 	docker-compose -f docker/docker-compose.agent-worker.yml build
@@ -58,9 +123,18 @@ docker-up: ## Start all services with Docker
 	docker-compose -f docker/docker-compose.controller.yml up -d
 	docker-compose -f docker/docker-compose.agent-worker.yml up -d
 
+docker-up-strategy: ## Start services with strategy pattern testing
+	docker-compose -f docker-compose.strategy-test.yml up -d
+
 docker-down: ## Stop all services
 	docker-compose -f docker/docker-compose.controller.yml down
 	docker-compose -f docker/docker-compose.agent-worker.yml down
+
+docker-down-strategy: ## Stop strategy test services
+	docker-compose -f docker-compose.strategy-test.yml down
+
+test-strategy: ## Test strategy pattern architecture
+	./scripts/test-strategy-pattern.sh
 
 docker-logs: ## Show Docker logs
 	docker-compose -f docker/docker-compose.controller.yml logs -f

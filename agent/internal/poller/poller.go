@@ -174,3 +174,16 @@ func (p *Poller) saveCache(config models.ConfigResponse) error {
 
 	return os.WriteFile(p.cacheFile, data, 0644)
 }
+
+// SetPollingInterval updates the polling interval dynamically
+func (p *Poller) SetPollingInterval(seconds int) {
+	newInterval := time.Duration(seconds) * time.Second
+	select {
+	case p.updateIntervalCh <- newInterval:
+		logger.Log.Infof("Updated polling interval to %d seconds", seconds)
+	default:
+		// Channel is full, just update directly
+		p.pollInterval = newInterval
+		logger.Log.Infof("Updated polling interval to %d seconds (direct)", seconds)
+	}
+}

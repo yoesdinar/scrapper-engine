@@ -9,12 +9,14 @@ import (
 	"github.com/doniyusdinar/config-management/pkg/auth"
 	"github.com/doniyusdinar/config-management/pkg/logger"
 	"github.com/doniyusdinar/config-management/pkg/models"
+	"github.com/doniyusdinar/config-management/pkg/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type Handler struct {
 	db            *database.DB
+	redisClient   *redis.Client
 	agentUsername string
 	agentPassword string
 	adminUsername string
@@ -22,9 +24,10 @@ type Handler struct {
 	pollInterval  int
 }
 
-func NewHandler(db *database.DB) *Handler {
+func NewHandler(db *database.DB, redisClient *redis.Client) *Handler {
 	return &Handler{
 		db:            db,
+		redisClient:   redisClient,
 		agentUsername: getEnv("AGENT_USERNAME", "agent"),
 		agentPassword: getEnv("AGENT_PASSWORD", "secret123"),
 		adminUsername: getEnv("ADMIN_USERNAME", "admin"),
@@ -177,6 +180,18 @@ func (h *Handler) UpdateConfig(c *gin.Context) {
 	}
 
 	logger.Log.Infof("Configuration updated to version %d", version)
+
+	// Publish to Redis if available (non-blocking)
+	if h.redisClient != nil && h.redisClient.IsConnected() {
+		versionStr := strconv.Itoa(int(version))
+		if err := h.redisClient.PublishConfig(config, versionStr); err != nil {
+			logger.Log.Warnf("Failed to publish config to Redis (continuing with polling): %v", err)
+		} else {
+			// Store backup in Redis
+			h.redisClient.StoreConfigInRedis(config, versionStr)
+			logger.Log.Info("Configuration published to Redis successfully")
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Configuration updated successfully",
