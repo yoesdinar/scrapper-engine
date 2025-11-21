@@ -71,7 +71,7 @@ services:
     image: nginx:alpine
     container_name: external-loadbalancer
     ports:
-      - "8080:80"   # Single endpoint for external clients: /worker/hit
+      - "8085:80"   # Single endpoint for external clients: /worker/hit
     volumes:
       - ./nginx/external-lb.conf:/etc/nginx/nginx.conf:ro
     networks:
