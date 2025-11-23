@@ -281,11 +281,34 @@ curl http://localhost:8082/hit
 
 ## Testing
 
-### Manual Testing Flow
+### Local Testing with Makefile
 
-1. **Start all services** (Controller, Worker, Agent)
+The project includes a comprehensive Makefile for easy local development and testing.
 
-2. **Update configuration:**
+#### Run Services Locally
+
+```bash
+# HTTP Polling Strategy (default)
+make run-controller-poller    # Terminal 1
+make run-worker              # Terminal 2
+make run-agent-poller        # Terminal 3
+
+# Redis Strategy (instant updates)
+make start-redis            # Start Redis server
+make run-controller-redis   # Terminal 1
+make run-worker            # Terminal 2
+make run-agent-redis       # Terminal 3
+
+# NATS Strategy (large-scale)
+make start-nats            # Start NATS server
+make run-controller-nats   # Terminal 1
+make run-worker           # Terminal 2
+make run-agent-nats       # Terminal 3
+```
+
+#### Local Testing Commands
+
+1. **Update configuration:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/config \
   -u admin:admin123 \
@@ -293,15 +316,13 @@ curl -X POST http://localhost:8080/api/v1/config \
   -d '{"url":"https://ip.me"}'
 ```
 
-3. **Wait for agent to poll** (~30 seconds by default)
-
-4. **Test worker:**
+2. **Test worker response:**
 ```bash
 curl http://localhost:8082/hit
 # Should return your public IP
 ```
 
-5. **Change configuration:**
+3. **Change configuration:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/config \
   -u admin:admin123 \
@@ -309,10 +330,124 @@ curl -X POST http://localhost:8080/api/v1/config \
   -d '{"url":"https://api.github.com"}'
 ```
 
-6. **Test again:**
+4. **Test updated configuration:**
 ```bash
 curl http://localhost:8082/hit
 # Should now return GitHub API response
+```
+
+#### Quick Test Suites
+
+```bash
+# Test strategy pattern architecture
+make test-strategy
+
+# Test Redis strategy locally
+make test-redis-local
+
+# Test NATS strategy locally
+make test-nats-local
+
+# Run unit tests
+make test
+```
+
+### Production Testing
+
+After deploying to production (see [GitHub Actions Deployment](GITHUB-ACTIONS-DEPLOYMENT.md)), test your deployment:
+
+#### Health Checks
+
+```bash
+# Controller health
+curl http://103.157.116.91:8080/health
+
+# External load balancer health
+curl http://103.157.116.91/health
+```
+
+#### Test Worker Endpoint (via Load Balancer)
+
+```bash
+# Test worker through external load balancer
+curl http://103.157.116.91/worker/hit
+```
+
+This should return the response from the configured URL (distributed across worker1, worker2, worker3).
+
+#### Update Configuration in Production
+
+```bash
+# Update production configuration
+curl -s -X POST http://103.157.116.91/admin/api/v1/config \
+  -u admin:admin-prod-456 \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://api.github.com"}'
+```
+
+**Expected Response:**
+```json
+{
+  "message": "Configuration updated successfully",
+  "version": 2
+}
+```
+
+#### Verify Configuration Update
+
+```bash
+# Wait 1-2 seconds (NATS strategy is instant)
+sleep 2
+
+# Test worker endpoint again
+curl http://103.157.116.91/worker/hit
+```
+
+This should now return the GitHub API response instead of the previous URL.
+
+#### Production Test Flow Example
+
+```bash
+# 1. Update config to ip.me
+curl -s -X POST http://103.157.116.91/admin/api/v1/config \
+  -u admin:admin-prod-456 \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://ip.me"}'
+
+# 2. Wait for NATS distribution (instant)
+sleep 2
+
+# 3. Test worker - should return public IP
+curl http://103.157.116.91/worker/hit
+
+# 4. Update config to GitHub API
+curl -s -X POST http://103.157.116.91/admin/api/v1/config \
+  -u admin:admin-prod-456 \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://api.github.com"}'
+
+# 5. Wait for distribution
+sleep 2
+
+# 6. Test worker - should return GitHub API response
+curl http://103.157.116.91/worker/hit
+```
+
+#### Check Production Logs
+
+```bash
+# SSH to production server
+ssh root@103.157.116.91
+
+# View all services
+cd /root/config-management
+docker compose ps
+
+# View logs
+docker compose logs -f controller
+docker compose logs -f agent1
+docker compose logs -f worker1
+docker compose logs -f nats
 ```
 
 ### Run Unit Tests
